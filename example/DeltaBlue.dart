@@ -104,14 +104,15 @@ abstract class Constraint {
 
   const Constraint(this.strength);
 
-  bool isSatisfied();
+  bool get isSatisfied;
+  Variable get output;
+
   void markUnsatisfied();
   void addToGraph();
   void removeFromGraph();
   void chooseMethod(int mark);
   void markInputs(int mark);
   bool inputsKnown(int mark);
-  Variable output();
   void execute();
   void recalculate();
 
@@ -130,14 +131,14 @@ abstract class Constraint {
    */
   Constraint satisfy(mark) {
     chooseMethod(mark);
-    if (!isSatisfied()) {
+    if (!isSatisfied) {
       if (strength == REQUIRED) {
         print("Could not satisfy a required constraint!");
       }
       return null;
     }
     markInputs(mark);
-    Variable out = output();
+    Variable out = output;
     Constraint overridden = out.determinedBy;
     if (overridden != null) overridden.markUnsatisfied();
     out.determinedBy = this;
@@ -147,7 +148,7 @@ abstract class Constraint {
   }
 
   void destroyConstraint() {
-    if (isSatisfied()) planner.incrementalRemove(this);
+    if (isSatisfied) planner.incrementalRemove(this);
     removeFromGraph();
   }
 
@@ -156,7 +157,7 @@ abstract class Constraint {
    * is one that depends on external state, such as the mouse, the
    * keybord, a clock, or some arbitraty piece of imperative code.
    */
-  bool isInput() => false;
+  bool get isInput => false;
 }
 
 /**
@@ -184,14 +185,14 @@ abstract class UnaryConstraint extends Constraint {
   }
 
   /// Returns true if this constraint is satisfied in the current solution.
-  bool isSatisfied() => satisfied;
+  bool get isSatisfied => satisfied;
 
   void markInputs(int mark) {
     // has no inputs.
   }
 
   /// Returns the current output variable.
-  Variable output() => myOutput;
+  Variable get output => myOutput;
 
   /**
    * Calculate the walkabout strength, the stay flag, and, if it is
@@ -200,7 +201,7 @@ abstract class UnaryConstraint extends Constraint {
    */
   void recalculate() {
     myOutput.walkStrength = strength;
-    myOutput.stay = !isInput();
+    myOutput.stay = !isInput;
     if (myOutput.stay) execute(); // Stay optimization.
   }
 
@@ -243,7 +244,7 @@ class EditConstraint extends UnaryConstraint {
   EditConstraint(Variable v, Strength str) : super(v, str);
 
   /// Edits indicate that a variable is to be changed by imperative code.
-  bool isInput() => true;
+  bool get isInput => true;
 
   void execute() {
     // Edit constraints do nothing.
@@ -304,18 +305,18 @@ abstract class BinaryConstraint extends Constraint {
   }
 
   /// Answer true if this constraint is satisfied in the current solution.
-  bool isSatisfied() => direction != NONE;
+  bool get isSatisfied => direction != NONE;
 
   /// Mark the input variable with the given mark.
   void markInputs(int mark) {
-    input().mark = mark;
+    input.mark = mark;
   }
 
   /// Returns the current input variable
-  Variable input() => direction == FORWARD ? v1 : v2;
+  Variable get input => direction == FORWARD ? v1 : v2;
 
   /// Returns the current output variable.
-  Variable output() => direction == FORWARD ? v2 : v1;
+  Variable get output => direction == FORWARD ? v2 : v1;
 
   /**
    * Calculate the walkabout strength, the stay flag, and, if it is
@@ -323,7 +324,7 @@ abstract class BinaryConstraint extends Constraint {
    * constraint. Assume this constraint is satisfied.
    */
   void recalculate() {
-    Variable ihn = input(), out = output();
+    Variable ihn = input, out = output;
     out.walkStrength = Strength.weakest(strength, ihn.walkStrength);
     out.stay = ihn.stay;
     if (out.stay) execute();
@@ -335,7 +336,7 @@ abstract class BinaryConstraint extends Constraint {
   }
 
   bool inputsKnown(int mark) {
-    Variable i = input();
+    Variable i = input;
     return i.mark == mark || i.stay || i.determinedBy == null;
   }
 
@@ -396,7 +397,7 @@ class ScaleConstraint extends BinaryConstraint {
    * this constraint is satisfied.
    */
   void recalculate() {
-    Variable ihn = input(), out = output();
+    Variable ihn = input, out = output;
     out.walkStrength = Strength.weakest(strength, ihn.walkStrength);
     out.stay = ihn.stay && scale.stay && offset.stay;
     if (out.stay) execute();
@@ -415,7 +416,7 @@ class EqualityConstraint extends BinaryConstraint {
 
   /// Enforce this constraint. Assume that it is satisfied.
   void execute() {
-    output().value = input().value;
+    output.value = input.value;
   }
 }
 
@@ -491,7 +492,7 @@ class Planner {
    * Assume: [c] is satisfied.
    */
   void incrementalRemove(Constraint c) {
-    Variable out = c.output();
+    Variable out = c.output;
     c.markUnsatisfied();
     c.removeFromGraph();
     List<Constraint> unsatisfied = removePropagateFrom(out);
@@ -533,10 +534,10 @@ class Planner {
     List<Constraint> todo = sources;
     while (todo.length > 0) {
       Constraint c = todo.removeLast();
-      if (c.output().mark != mark && c.inputsKnown(mark)) {
+      if (c.output.mark != mark && c.inputsKnown(mark)) {
         plan.addConstraint(c);
-        c.output().mark = mark;
-        addConstraintsConsumingTo(c.output(), todo);
+        c.output.mark = mark;
+        addConstraintsConsumingTo(c.output, todo);
       }
     }
     return plan;
@@ -551,7 +552,7 @@ class Planner {
     for (int i = 0; i < constraints.length; i++) {
       Constraint c = constraints[i];
       // if not in plan already and eligible for inclusion.
-      if (c.isInput() && c.isSatisfied()) sources.add(c);
+      if (c.isInput && c.isSatisfied) sources.add(c);
     }
     return makePlan(sources);
   }
@@ -573,12 +574,12 @@ class Planner {
     List<Constraint> todo = <Constraint>[c];
     while (todo.length > 0) {
       Constraint d = todo.removeLast();
-      if (d.output().mark == mark) {
+      if (d.output.mark == mark) {
         incrementalRemove(c);
         return false;
       }
       d.recalculate();
-      addConstraintsConsumingTo(d.output(), todo);
+      addConstraintsConsumingTo(d.output, todo);
     }
     return true;
   }
@@ -598,14 +599,14 @@ class Planner {
       Variable v = todo.removeLast();
       for (int i = 0; i < v.constraints.length; i++) {
         Constraint c = v.constraints[i];
-        if (!c.isSatisfied()) unsatisfied.add(c);
+        if (!c.isSatisfied) unsatisfied.add(c);
       }
       Constraint determining = v.determinedBy;
       for (int i = 0; i < v.constraints.length; i++) {
         Constraint next = v.constraints[i];
-        if (next != determining && next.isSatisfied()) {
+        if (next != determining && next.isSatisfied) {
           next.recalculate();
-          todo.add(next.output());
+          todo.add(next.output);
         }
       }
     }
@@ -616,7 +617,7 @@ class Planner {
     Constraint determining = v.determinedBy;
     for (int i = 0; i < v.constraints.length; i++) {
       Constraint c = v.constraints[i];
-      if (c != determining && c.isSatisfied()) coll.add(c);
+      if (c != determining && c.isSatisfied) coll.add(c);
     }
   }
 }
