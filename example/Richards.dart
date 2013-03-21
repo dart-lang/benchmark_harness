@@ -77,8 +77,8 @@ class Richards extends BenchmarkBase {
       print("Error during execution: queueCount = ${scheduler.queueCount}"
             ", holdCount = ${scheduler.holdCount}.");
     }
-    Expect.equals(EXPECTED_QUEUE_COUNT, scheduler.queueCount);
-    Expect.equals(EXPECTED_HOLD_COUNT, scheduler.holdCount);
+    assert(EXPECTED_QUEUE_COUNT == scheduler.queueCount);
+    assert(EXPECTED_HOLD_COUNT == scheduler.holdCount);
   }
 
   static const int DATA_SIZE = 4;
@@ -120,7 +120,7 @@ class Scheduler {
   int currentId;
   TaskControlBlock list;
   List<TaskControlBlock> blocks =
-    new List<TaskControlBlock>.fixedLength(Richards.NUMBER_OF_IDS);
+    new List<TaskControlBlock>(Richards.NUMBER_OF_IDS);
 
   /// Add an idle task to this scheduler.
   void addIdleTask(int id, int priority, Packet queue, int count) {
@@ -461,7 +461,7 @@ class Packet {
   int kind;    // The type of this packet.
   int a1 = 0;
 
-  List<int> a2 = new List.fixedLength(Richards.DATA_SIZE);
+  List<int> a2 = new List(Richards.DATA_SIZE);
 
   Packet(this.link, this.id, this.kind);
 
