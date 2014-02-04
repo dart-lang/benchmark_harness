@@ -6,7 +6,7 @@ class BenchmarkBase {
   final String name;
 
   // Empty constructor.
-  const BenchmarkBase(String name) : this.name = name;
+  const BenchmarkBase(this.name);
 
   // The benchmark code.
   // This function is not used, if both [warmup] and [exercise] are overwritten.
@@ -33,14 +33,10 @@ class BenchmarkBase {
   // Measures the score for this benchmark by executing it repeately until
   // time minimum has been reached.
   static double measureFor(Function f, int timeMinimum) {
-    int time = 0;
-    int iter = 0;
-    Stopwatch watch = new Stopwatch();
-    watch.start();
-    int elapsed = 0;
-    while (elapsed < timeMinimum) {
+    int iter = 0, elapsed;
+    Stopwatch watch = new Stopwatch()..start();
+    for (elapsed = 0; elapsed < timeMinimum; elapsed = watch.elapsedMilliseconds) {
       f();
-      elapsed = watch.elapsedMilliseconds;
       iter++;
     }
     return 1000.0 * elapsed / iter;
