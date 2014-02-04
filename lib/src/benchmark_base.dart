@@ -4,9 +4,11 @@ part of benchmark_harness;
 
 class BenchmarkBase {
   final String name;
+  final int runLoops;
+  final int runTimeMs;
 
   // Empty constructor.
-  const BenchmarkBase(String name) : this.name = name;
+  const BenchmarkBase(this.name, {this.runLoops: 10, this.runTimeMs: 2000});
 
   // The benchmark code.
   // This function is not used, if both [warmup] and [exercise] are overwritten.
@@ -19,7 +21,7 @@ class BenchmarkBase {
 
   // Exercices the benchmark. By default invokes [run] 10 times.
   void exercise() {
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < runLoops; i++) {
       run();
     }
   }
@@ -52,7 +54,7 @@ class BenchmarkBase {
     // Warmup for at least 100ms. Discard result.
     measureFor(() { this.warmup(); }, 100);
     // Run the benchmark for at least 2000ms.
-    double result = measureFor(() { this.exercise(); }, 2000);
+    double result = measureFor(() { this.exercise(); }, runTimeMs);
     teardown();
     return result;
   }
