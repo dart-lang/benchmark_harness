@@ -84,3 +84,8 @@ main() {
   TemplateBenchmark.main();
 }
 ```
+###Output
+```
+Template(RunTime): 0.1568472448997197 us.
+```
+> µs is an abbreviation for microseconds.
