@@ -19,8 +19,10 @@ void main() {
     test('can set warmup and excersize iterations and runs per iteration', () {
       MockBenchmark benchmark = new MockBenchmark();
       double micros = benchmark.measure(
-          maxWarmupIterations: 5, maxExerciseIterations: 5,
-          runsPerWarmup: 5, runsPerExercise: 5);
+          maxWarmupIterations: 5,
+          maxExerciseIterations: 5,
+          runsPerWarmup: 5,
+          runsPerExercise: 5);
       // 25 total runs from each (5 * 5)
       expect(benchmark.runCount, 50);
       expect(benchmark.warmupCount, 5);

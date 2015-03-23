@@ -7,14 +7,13 @@ class BenchmarkBase {
   final ScoreEmitter emitter;
 
   /// Empty constructor.
-  const BenchmarkBase(String name,
-      { ScoreEmitter emitter: const PrintEmitter() })
+  const BenchmarkBase(String name, {ScoreEmitter emitter: const PrintEmitter()})
       : this.name = name,
         this.emitter = emitter;
 
   /// The benchmark code.
   /// This function is not used if both [warmup] and [exercise] are overwritten.
-  void run() { }
+  void run() {}
 
   /// Runs a short version of the benchmark. By default invokes [run] once.
   void warmup({int iterations: 1}) {
@@ -31,10 +30,10 @@ class BenchmarkBase {
   }
 
   /// Not measured setup code executed prior to the benchmark runs.
-  void setup() { }
+  void setup() {}
 
   /// Not measured teardown code executed after the benchark runs.
-  void teardown() { }
+  void teardown() {}
 
   /// Measures the score for this benchmark by executing it repeately until
   /// either the [minimumMillis] or [maxIterations] has been reached.
@@ -62,19 +61,19 @@ class BenchmarkBase {
   /// result. Then runs the benchmark for either [minimumBenchmarkMillis] or
   /// [maxExerciseIterations] * [runsPerExercise] iterations and returns the
   /// result.
-  double measure(
-      {int minimumWarmupMillis: 100, int minimumBenchmarkMillis: 2000,
-      int maxWarmupIterations: null, int runsPerWarmup: 1,
-      int maxExerciseIterations: null, int runsPerExercise: 10}) {
+  double measure({int minimumWarmupMillis: 100,
+      int minimumBenchmarkMillis: 2000, int maxWarmupIterations: null,
+      int runsPerWarmup: 1, int maxExerciseIterations: null,
+      int runsPerExercise: 10}) {
     setup();
     // Run the warmup.
-    measureFor(
-        () { this.warmup(iterations: runsPerWarmup); },
-        minimumWarmupMillis, maxIterations: maxWarmupIterations);
+    measureFor(() {
+      this.warmup(iterations: runsPerWarmup);
+    }, minimumWarmupMillis, maxIterations: maxWarmupIterations);
     // Run the benchmark.
-    double result = measureFor(
-        () {this.exercise(iterations: runsPerExercise); },
-        minimumBenchmarkMillis, maxIterations: maxExerciseIterations);
+    double result = measureFor(() {
+      this.exercise(iterations: runsPerExercise);
+    }, minimumBenchmarkMillis, maxIterations: maxExerciseIterations);
     teardown();
     return result;
   }
@@ -82,5 +81,4 @@ class BenchmarkBase {
   void report() {
     emitter.emit(name, measure());
   }
-
 }
