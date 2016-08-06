@@ -45,7 +45,7 @@ class BenchmarkBase {
     while (elapsed < minimumMicros) {
       f();
       elapsed = watch.elapsedMicroseconds;
-      iter++;
+      iter+=10; // each f() runs the benchmarking fn 10 times
     }
     return elapsed / iter;
   }
