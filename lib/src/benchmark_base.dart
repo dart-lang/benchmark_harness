@@ -35,15 +35,18 @@ class BenchmarkBase {
   // time minimum has been reached.
   static double measureFor(Function f, int minimumMillis) {
     int minimumMicros = minimumMillis * 1000;
-    int iter = 0;
+    int iter = 1;
+    int elapsed = 0;
     Stopwatch watch = Stopwatch();
     watch.start();
-    int elapsed = 0;
-    while (elapsed < minimumMicros) {
-      f();
+    do {
+      watch.reset();
+      for (int i = 0; i < iter; i++) {
+        f();
+      }
       elapsed = watch.elapsedMicroseconds;
-      iter++;
-    }
+      iter *= 2;
+    } while (elapsed < minimumMicros);
     return elapsed / iter;
   }
 
