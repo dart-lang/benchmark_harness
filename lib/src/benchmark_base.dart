@@ -39,21 +39,17 @@ class BenchmarkBase {
     int elapsed = 0;
     Stopwatch watch = Stopwatch();
     watch.start();
-    while (iter > 0) {
+    while (true) { // ignore: literal_only_boolean_expressions
       watch.reset();
-
       for (int i = 0; i < iter; i++) {
         f();
       }
-
       elapsed = watch.elapsedMicroseconds;
       if (elapsed >= minimumMicros) {
         return elapsed / iter;
       }
-
       iter *= 2;
     }
-    throw "Iteration counter overflowed.  Use a smaller minimum time.";
   }
 
   // Measures the score for the benchmark and returns it.
