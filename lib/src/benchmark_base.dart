@@ -6,11 +6,11 @@ class BenchmarkBase {
   final String name;
   final ScoreEmitter emitter;
 
-  // Empty constructor.
+  // Subclasses must provide in their super constructor invocation.
   const BenchmarkBase(this.name, {this.emitter = const PrintEmitter()});
 
   // The benchmark code.
-  // This function is not used, if both [warmup] and [exercise] are overwritten.
+  // This function is not used if both [warmup] and [exercise] are overwritten.
   void run() {}
 
   // Runs a short version of the benchmark. By default invokes [run] once.
@@ -25,10 +25,10 @@ class BenchmarkBase {
     }
   }
 
-  // Not measured setup code executed prior to the benchmark runs.
+  // Unmeasured setup code executed prior to the benchmark runs.
   void setup() {}
 
-  // Not measures teardown code executed after the benchark runs.
+  // Unmeasured teardown code executed after the benchark runs.
   void teardown() {}
 
   // Measures the score for this benchmark by executing it repeately until
@@ -39,10 +39,16 @@ class BenchmarkBase {
     Stopwatch watch = Stopwatch();
     watch.start();
     int elapsed = 0;
+    int loop = 1;
     while (elapsed < minimumMicros) {
-      f();
-      elapsed = watch.elapsedMicroseconds;
-      iter++;
+      watch.reset();
+      for (int i = 0; i < loop; i++) {
+        f();
+      }
+      int elapsedSince = watch.elapsedMicroseconds;
+      elapsed += elapsedSince;
+      iter += loop;
+      if (elapsedSince < 50) loop *= 2;
     }
     return elapsed / iter;
   }
