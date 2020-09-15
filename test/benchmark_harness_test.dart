@@ -4,14 +4,14 @@
 
 library benchmark_harness_test;
 
-import 'package:benchmark_harness/benchmark_harness.dart';
-import 'package:test/test.dart';
+import 'package:test/test.dart' show expect, group, isPositive, test;
+
+import 'package:benchmark_harness/benchmark_harness.dart' show BenchmarkBase;
 
 void main() {
   group('benchmark_harness', () {
     test('run is called', () {
-      var benchmark = MockBenchmark();
-      var micros = benchmark.measure();
+      final benchmark = MockBenchmark(), micros = benchmark.measure();
       expect(micros, isPositive);
       expect(benchmark.runCount, isPositive);
     });
@@ -24,7 +24,5 @@ class MockBenchmark extends BenchmarkBase {
   MockBenchmark() : super('mock benchmark');
 
   @override
-  void run() {
-    runCount++;
-  }
+  void run() => runCount++;
 }
