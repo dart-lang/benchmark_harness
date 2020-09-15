@@ -1,20 +1,17 @@
 library result_emitter_test;
 
-import 'package:benchmark_harness/benchmark_harness.dart';
+import 'package:test/test.dart' show equals, expect, group, test;
 
-import 'package:test/test.dart';
+import 'package:benchmark_harness/benchmark_harness.dart'
+    show BenchmarkBase, ScoreEmitter;
 
-void main() {
-  benchmarkHarnessTest();
-}
+void main() => benchmarkHarnessTest();
 
 class MockResultEmitter extends ScoreEmitter {
   int emitCount = 0;
 
   @override
-  void emit(String name, double value) {
-    emitCount++;
-  }
+  void emit(String name, double value) => emitCount++;
 }
 
 // Create a new benchmark which has an emitter.
@@ -33,15 +30,11 @@ class BenchmarkWithResultEmitter extends BenchmarkBase {
 }
 
 void benchmarkHarnessTest() {
-  MockResultEmitter createMockEmitter() {
-    var emitter = MockResultEmitter();
-    return emitter;
-  }
-
   group('ResultEmitter', () {
     test('should be called when emitter is provided', () {
-      var emitter = createMockEmitter();
-      var testBenchmark = BenchmarkWithResultEmitter(emitter);
+      final emitter = MockResultEmitter(),
+          testBenchmark = BenchmarkWithResultEmitter(emitter);
+
       testBenchmark.report();
 
       expect(emitter.emitCount, equals(1));
