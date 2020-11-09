@@ -1,4 +1,4 @@
-## 1.1.0-nullsafety.1
+## 1.1.0-nullsafety.0
 
 - Opt in to null safety.
 
