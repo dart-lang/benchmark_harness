@@ -59,7 +59,7 @@ import 'package:benchmark_harness/benchmark_harness.dart';
 Create a dart file in the [`benchmark/`](https://www.dartlang.org/tools/pub/package-layout#tests-and-benchmarks)
 folder of your package.
 
-```
+```dart
 // Import BenchmarkBase class.
 import 'package:benchmark_harness/benchmark_harness.dart';
 
@@ -68,24 +68,23 @@ class TemplateBenchmark extends BenchmarkBase {
   const TemplateBenchmark() : super('Template');
 
   static void main() {
-    TemplateBenchmark().report();
+    const TemplateBenchmark().report();
   }
 
   // The benchmark code.
   @override
-  void run() {
-  }
+  void run() {}
 
   // Not measured setup code executed prior to the benchmark runs.
   @override
-  void setup() { }
+  void setup() {}
 
-  // Not measured teardown code executed after the benchmark runs.
+  // Not measures teardown code executed after the benchark runs.
   @override
-  void teardown() { }
+  void teardown() {}
 }
 
-main() {
+void main() {
   // Run TemplateBenchmark
   TemplateBenchmark.main();
 }
