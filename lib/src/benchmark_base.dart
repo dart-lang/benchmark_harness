@@ -40,7 +40,7 @@ class BenchmarkBase {
     var iter = 1;
     var elapsed = 0;
     final watch = Stopwatch()..start();
-    while (true) { // ignore: literal_only_boolean_expressions
+    while (true) {
       watch.reset();
       for (var i = 0; i < iter; i++) {
         f();
