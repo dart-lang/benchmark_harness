@@ -35,9 +35,10 @@ class BenchmarkBase {
 
   // Measures the score for this benchmark by executing it repeatedly until
   // time minimum has been reached.
-  static double measureFor(void Function() f, int minimumMillis) {
+  static _Measurement _measureForImpl(
+      void Function() f, int minimumMillis, int initialIter) {
     final minimumMicros = minimumMillis * 1000;
-    var iter = 1;
+    var iter = initialIter;
     var elapsed = 0;
     final watch = Stopwatch()..start();
     while (true) {
@@ -47,24 +48,42 @@ class BenchmarkBase {
       }
       elapsed = watch.elapsedMicroseconds;
       if (elapsed >= minimumMicros) {
-        return elapsed / iter;
+        return _Measurement(elapsed, iter);
       }
-      iter *= 2;
+      if (elapsed == 0) {
+        iter *= 1000;
+      } else {
+        iter = (iter * math.max(minimumMicros / elapsed, 2.0)).ceil();
+      }
     }
   }
+
+  // Measures the score for this benchmark by executing it repeatedly until
+  // time minimum has been reached.
+  static double measureFor(void Function() f, int minimumMillis) =>
+      _measureForImpl(f, minimumMillis, 1).score;
 
   // Measures the score for the benchmark and returns it.
   double measure() {
     setup();
     // Warmup for at least 100ms. Discard result.
-    measureFor(warmup, 100);
+    final measurement = _measureForImpl(warmup, 100, 1);
     // Run the benchmark for at least 2000ms.
-    var result = measureFor(exercise, 2000);
+    var result = _measureForImpl(exercise, 2000, measurement.iterations);
     teardown();
-    return result;
+    return result.score;
   }
 
   void report() {
     emitter.emit(name, measure());
   }
+}
+
+class _Measurement {
+  final int elapsedMicros;
+  final int iterations;
+
+  _Measurement(this.elapsedMicros, this.iterations);
+
+  double get score => elapsedMicros / iterations;
 }
