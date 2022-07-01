@@ -4,6 +4,8 @@
 
 part of benchmark_harness;
 
+const int _minimumMeasureDurationMillis = 2000;
+
 class BenchmarkBase {
   final String name;
   final ScoreEmitter emitter;
@@ -38,41 +40,38 @@ class BenchmarkBase {
   ///
   /// This function searches for the requisite number of iterations by
   /// starting at [initialIter].
-  static _Measurement _measureForImpl(
-      void Function() f, int minimumMillis, int initialIter) {
+  static _Measurement _measureForImpl(void Function() f, int minimumMillis) {
     final minimumMicros = minimumMillis * 1000;
-    var iter = initialIter;
-    var elapsed = 0;
+    var iter = 2;
     final watch = Stopwatch()..start();
     while (true) {
       watch.reset();
       for (var i = 0; i < iter; i++) {
         f();
       }
-      elapsed = watch.elapsedMicroseconds;
-      if (elapsed >= minimumMicros) {
-        return _Measurement(elapsed, iter);
+      final elapsed = watch.elapsedMicroseconds;
+      final measurement = _Measurement(elapsed, iter);
+      if (measurement.elapsedMicros >= minimumMicros) {
+        return measurement;
       }
-      if (elapsed == 0) {
-        iter *= 1000;
-      } else {
-        iter = (iter * math.max(minimumMicros / elapsed, 2.0)).ceil();
-      }
+
+      iter = measurement.estimateIterationsNeededToReach(
+          minimumMicros: minimumMicros);
     }
   }
 
   /// Measures the score for this benchmark by executing it repeatedly until
   /// time minimum has been reached.
   static double measureFor(void Function() f, int minimumMillis) =>
-      _measureForImpl(f, minimumMillis, 1).score;
+      _measureForImpl(f, minimumMillis).score;
 
   /// Measures the score for the benchmark and returns it.
   double measure() {
     setup();
     // Warmup for at least 100ms. Discard result.
-    final measurement = _measureForImpl(warmup, 100, 1);
+    final measurement = _measureForImpl(warmup, 100);
     // Run the benchmark for at least 2000ms.
-    var result = _measureForImpl(exercise, 2000, measurement.iterations);
+    var result = _measureForImpl(exercise, _minimumMeasureDurationMillis);
     teardown();
     return result.score;
   }
@@ -89,4 +88,18 @@ class _Measurement {
   _Measurement(this.elapsedMicros, this.iterations);
 
   double get score => elapsedMicros / iterations;
+
+  int estimateIterationsNeededToReach({required int minimumMicros}) =>
+      elapsedMicros == 0
+          ? iterations * 1000
+          : (iterations *
+                  math.max(
+                      minimumMicros / roundDownToMillisecond(elapsedMicros),
+                      1.5))
+              .ceil();
+
+  static int roundDownToMillisecond(int micros) => (micros ~/ 1000) * 1000;
+
+  @override
+  String toString() => '$elapsedMicros in $iterations iterations';
 }
