@@ -37,9 +37,6 @@ class BenchmarkBase {
 
   /// Measures the score for this benchmark by executing it enough times
   /// to reach [minimumMillis].
-  ///
-  /// This function searches for the requisite number of iterations by
-  /// starting at [initialIter].
   static _Measurement _measureForImpl(void Function() f, int minimumMillis) {
     final minimumMicros = minimumMillis * 1000;
     var iter = 2;
@@ -69,7 +66,7 @@ class BenchmarkBase {
   double measure() {
     setup();
     // Warmup for at least 100ms. Discard result.
-    final measurement = _measureForImpl(warmup, 100);
+    _measureForImpl(warmup, 100);
     // Run the benchmark for at least 2000ms.
     var result = _measureForImpl(exercise, _minimumMeasureDurationMillis);
     teardown();
