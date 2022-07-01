@@ -86,14 +86,12 @@ class _Measurement {
 
   double get score => elapsedMicros / iterations;
 
-  int estimateIterationsNeededToReach({required int minimumMicros}) =>
-      elapsedMicros == 0
-          ? iterations * 1000
-          : (iterations *
-                  math.max(
-                      minimumMicros / roundDownToMillisecond(elapsedMicros),
-                      1.5))
-              .ceil();
+  int estimateIterationsNeededToReach({required int minimumMicros}) {
+    final elapsed = roundDownToMillisecond(elapsedMicros);
+    return elapsed == 0
+        ? iterations * 1000
+        : (iterations * math.max(minimumMicros / elapsed, 1.5)).ceil();
+  }
 
   static int roundDownToMillisecond(int micros) => (micros ~/ 1000) * 1000;
 
