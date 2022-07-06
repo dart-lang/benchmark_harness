@@ -1,4 +1,4 @@
-## 2.2.0-dev
+## 2.2.0
 
 - Change measuring algorithm in `BenchmarkBase` to avoid calling stopwatch
 methods repeatedly in the measuring loop. This makes measurement work better
