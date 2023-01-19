@@ -118,10 +118,10 @@ This is the average amount of time it takes to run `run()` 10 times for
 ### Contributions
 
 This package is carefully curated by the Dart team to exact specifications.
-Please open an issue with any proposed changes, before submitting a Pull
-Request.
+Please open an issue with any proposed changes before submitting a pull
+request.
 
-## Contributions, PRs, and publishing
+## PRs and publishing
 
 When contributing to this repo:
 
