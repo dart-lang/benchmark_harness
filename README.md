@@ -120,3 +120,22 @@ This is the average amount of time it takes to run `run()` 10 times for
 This package is carefully curated by the Dart team to exact specifications.
 Please open an issue with any proposed changes, before submitting a Pull
 Request.
+
+## Contributions, PRs, and publishing
+
+When contributing to this repo:
+
+- if the package version is a stable semver version (`x.y.z`), the latest
+  changes have been published to pub. Please add a new changelog section for
+  your change, rev the service portion of the version, append `-dev`, and update
+  the pubspec version to agree with the new version
+- if the package version ends in `-dev`, the latest changes are unpublished;
+  please add a new changelog entry for your change in the most recent section.
+  When we decide to publish the latest changes we'll drop the `-dev` suffix
+  from the package version
+- for PRs, the `Publish` bot will perform basic validation of the info in the
+  pubspec.yaml and CHANGELOG.md files
+- when the PR is merged into the main branch, if the change includes reving to
+  a new stable version, a repo maintainer will tag that commit with the pubspec
+  version (e.g., `v1.2.3`); that tag event will trigger the `Publish` bot to
+  publish a new version of the package to pub.dev
