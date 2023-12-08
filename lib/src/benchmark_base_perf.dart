@@ -8,20 +8,42 @@ import 'benchmark_base.dart' as base;
 import 'score_emitter.dart';
 
 const perfControlFifoVariable = 'PERF_CONTROL_FIFO';
+const perfControlAckVariable = 'PERF_CONTROL_ACK';
 
 class BenchmarkBase extends base.BenchmarkBase {
   BenchmarkBase(super.name, {super.emitter = const PrintEmitter()});
 
   String? perfControlFifo;
   late RandomAccessFile openedFifo;
+  String? perfControlAck;
+  late RandomAccessFile openedAck;
 
   @override
   void beforeTimedRuns() {
     perfControlFifo = Platform.environment[perfControlFifoVariable];
+    perfControlAck = Platform.environment[perfControlAckVariable];
     if (perfControlFifo != null) {
-      openedFifo = File(perfControlFifo!).openSync();
-      openedFifo.writeStringSync('enable\n');
-      // TODO: read 'ack\n' from second ack fifo, before proceeding.
+      openedFifo = File(perfControlFifo!).openSync(mode: FileMode.writeOnly);
+      if (perfControlAck != null) {
+        openedAck = File(perfControlAck!).openSync();
+        openedFifo.writeStringSync('enable\n');
+
+        var ack = <int>[...openedAck.readSync(4)];
+        while (ack.length < 4) {
+          ack.addAll(openedAck.readSync(4 - ack.length));
+          print('reading $ack');
+        }
+        if (String.fromCharCodes(ack) != 'ack\n') {
+          print('Ack was $ack');
+        }
+        /*  var ackLength = 0;
+        while (ackLength < 4) {
+          ackLength += openedAck.readSync(4 - ackLength).length;
+          print('reading $ackLength');
+        }*/
+      } else {
+        openedFifo.writeStringSync('enable\n');
+      }
     }
   }
 
@@ -29,9 +51,9 @@ class BenchmarkBase extends base.BenchmarkBase {
   void afterTimedRuns(int totalIterations) {
     if (perfControlFifo != null) {
       openedFifo.writeStringSync('disable\n');
+      openedFifo.closeSync();
+      emitter.emit('$name.totalIterations', totalIterations.toDouble());
     }
     // TODO: await ack.
-    openedFifo.closeSync();
-    emitter.emit('$name.totalIterations', totalIterations.toDouble());
   }
 }
