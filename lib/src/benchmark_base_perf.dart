@@ -27,20 +27,7 @@ class BenchmarkBase extends base.BenchmarkBase {
       if (perfControlAck != null) {
         openedAck = File(perfControlAck!).openSync();
         openedFifo.writeStringSync('enable\n');
-
-        var ack = <int>[...openedAck.readSync(4)];
-        while (ack.length < 4) {
-          ack.addAll(openedAck.readSync(4 - ack.length));
-          print('reading $ack');
-        }
-        if (String.fromCharCodes(ack) != 'ack\n') {
-          print('Ack was $ack');
-        }
-        /*  var ackLength = 0;
-        while (ackLength < 4) {
-          ackLength += openedAck.readSync(4 - ackLength).length;
-          print('reading $ackLength');
-        }*/
+        waitForAck();
       } else {
         openedFifo.writeStringSync('enable\n');
       }
@@ -52,8 +39,22 @@ class BenchmarkBase extends base.BenchmarkBase {
     if (perfControlFifo != null) {
       openedFifo.writeStringSync('disable\n');
       openedFifo.closeSync();
+      if (perfControlAck != null) {
+        waitForAck();
+        openedAck.closeSync();
+      }
       emitter.emit('$name.totalIterations', totalIterations.toDouble());
     }
-    // TODO: await ack.
+  }
+
+  void waitForAck() {
+    var ack = <int>[...openedAck.readSync(4)];
+    while (ack.length < 4) {
+      ack.addAll(openedAck.readSync(4 - ack.length));
+      print('reading $ack');
+    }
+    if (String.fromCharCodes(ack) != 'ack\n') {
+      print('Ack was $ack');
+    }
   }
 }

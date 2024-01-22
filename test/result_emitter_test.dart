@@ -20,7 +20,7 @@ class MockResultEmitter extends ScoreEmitter {
 
 // Create a new benchmark which has an emitter.
 class BenchmarkWithResultEmitter extends BenchmarkBase {
-  const BenchmarkWithResultEmitter(ScoreEmitter emitter)
+  BenchmarkWithResultEmitter(ScoreEmitter emitter)
       : super('Template', emitter: emitter);
 
   @override
