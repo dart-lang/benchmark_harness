@@ -38,13 +38,6 @@ class BenchmarkBase {
   /// Not measured teardown code executed after the benchmark runs.
   void teardown() {}
 
-  /// Not measured code run just before starting the timed runs
-  void beforeTimedRuns() {}
-
-  /// Not measured code run just after the timed runs finish.
-  /// Receives the total number of iterations run.
-  void afterTimedRuns(int totalIterations) {}
-
   /// Measures the score for this benchmark by executing it enough times
   /// to reach [minimumMillis].
 

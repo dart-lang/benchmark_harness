@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'benchmark_base.dart';
@@ -20,10 +21,22 @@ class PerfBenchmarkBase extends BenchmarkBase {
   late Process perfProcess;
 
   Future<void> _startPerfStat() async {
+    // TODO: Create these fifos here instead of getting them through env variables.
     perfControlFifo = Platform.environment[perfControlFifoVariable];
     perfControlAck = Platform.environment[perfControlAckVariable];
-    print(perfControlFifo);
     if (perfControlFifo != null) {
+      perfProcess = await Process.start('perf', [
+        'stat',
+        '--delay',
+        '-1',
+        '--control',
+        'fifo:$perfControlFifo,$perfControlAck',
+        '-j',
+        '-p',
+        '$pid'
+      ]);
+      await Future<void>.delayed(const Duration(seconds: 2));
+
       openedFifo = File(perfControlFifo!).openSync(mode: FileMode.writeOnly);
       if (perfControlAck != null) {
         openedAck = File(perfControlAck!).openSync();
@@ -43,7 +56,15 @@ class PerfBenchmarkBase extends BenchmarkBase {
         _waitForAck();
         openedAck.closeSync();
       }
-      emitter.emit('$name.totalIterations', totalIterations.toDouble());
+      perfProcess.kill(ProcessSignal.sigint);
+      final lines =
+          utf8.decoder.bind(perfProcess.stderr).transform(const LineSplitter());
+      final events = [
+        await for (final line in lines)
+          if (line.startsWith('{"counter-value" : '))
+            jsonDecode(line) as Map<String, dynamic>
+      ];
+      _reportPerfStats(events, totalIterations);
     }
   }
 
@@ -72,5 +93,18 @@ class PerfBenchmarkBase extends BenchmarkBase {
     if (String.fromCharCodes(ack) != 'ack\n\x00') {
       print('Ack was $ack');
     }
+  }
+
+  void _reportPerfStats(List<Map<String, dynamic>> events, int iterations) {
+    for (final {'event': String event, 'counter-value': String counterString}
+        in events) {
+      final metric =
+          {'cycles:u': 'CpuCycles', 'page-faults:u': 'MajorPageFaults'}[event];
+      if (metric != null) {
+        emitter.emit(
+            '$name($metric)', double.parse(counterString) / iterations);
+      }
+    }
+    emitter.emit('$name.totalIterations', iterations.toDouble());
   }
 }
