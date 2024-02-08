@@ -6,7 +6,7 @@ import 'dart:math' as math;
 
 import 'score_emitter.dart';
 
-const int _minimumMeasureDurationMillis = 2000;
+const int minimumMeasureDurationMillis = 2000;
 
 class BenchmarkBase {
   final String name;
@@ -47,46 +47,19 @@ class BenchmarkBase {
 
   /// Measures the score for this benchmark by executing it enough times
   /// to reach [minimumMillis].
-  static _Measurement _measureForImpl(void Function() f, int minimumMillis) {
-    final minimumMicros = minimumMillis * 1000;
-    // If running a long measurement permit some amount of measurement jitter
-    // to avoid discarding results that are almost good, but not quite there.
-    final allowedJitter =
-        minimumMillis < 1000 ? 0 : (minimumMicros * 0.1).floor();
-    var iter = 2;
-    var totalIterations = iter;
-    final watch = Stopwatch()..start();
-    while (true) {
-      watch.reset();
-      for (var i = 0; i < iter; i++) {
-        f();
-      }
-      final elapsed = watch.elapsedMicroseconds;
-      final measurement = _Measurement(elapsed, iter, totalIterations);
-      if (measurement.elapsedMicros >= (minimumMicros - allowedJitter)) {
-        return measurement;
-      }
-
-      iter = measurement.estimateIterationsNeededToReach(
-          minimumMicros: minimumMicros);
-      totalIterations += iter;
-    }
-  }
 
   /// Measures the score for this benchmark by executing it repeatedly until
   /// time minimum has been reached.
   static double measureFor(void Function() f, int minimumMillis) =>
-      _measureForImpl(f, minimumMillis).score;
+      measureForImpl(f, minimumMillis).score;
 
   /// Measures the score for the benchmark and returns it.
   double measure() {
     setup();
     // Warmup for at least 100ms. Discard result.
-    _measureForImpl(warmup, 100);
-    beforeTimedRuns();
+    measureForImpl(warmup, 100);
     // Run the benchmark for at least 2000ms.
-    var result = _measureForImpl(exercise, _minimumMeasureDurationMillis);
-    afterTimedRuns(result.totalIterations);
+    var result = measureForImpl(exercise, minimumMeasureDurationMillis);
     teardown();
     return result.score;
   }
@@ -96,12 +69,40 @@ class BenchmarkBase {
   }
 }
 
-class _Measurement {
+/// Measures the score for this benchmark by executing it enough times
+/// to reach [minimumMillis].
+Measurement measureForImpl(void Function() f, int minimumMillis) {
+  final minimumMicros = minimumMillis * 1000;
+  // If running a long measurement permit some amount of measurement jitter
+  // to avoid discarding results that are almost good, but not quite there.
+  final allowedJitter =
+      minimumMillis < 1000 ? 0 : (minimumMicros * 0.1).floor();
+  var iter = 2;
+  var totalIterations = iter;
+  final watch = Stopwatch()..start();
+  while (true) {
+    watch.reset();
+    for (var i = 0; i < iter; i++) {
+      f();
+    }
+    final elapsed = watch.elapsedMicroseconds;
+    final measurement = Measurement(elapsed, iter, totalIterations);
+    if (measurement.elapsedMicros >= (minimumMicros - allowedJitter)) {
+      return measurement;
+    }
+
+    iter = measurement.estimateIterationsNeededToReach(
+        minimumMicros: minimumMicros);
+    totalIterations += iter;
+  }
+}
+
+class Measurement {
   final int elapsedMicros;
   final int iterations;
   final int totalIterations;
 
-  _Measurement(this.elapsedMicros, this.iterations, this.totalIterations);
+  Measurement(this.elapsedMicros, this.iterations, this.totalIterations);
 
   double get score => elapsedMicros / iterations;
 
