@@ -8,24 +8,41 @@ import 'dart:io';
 import 'benchmark_base.dart';
 import 'score_emitter.dart';
 
-const perfControlFifoVariable = 'PERF_CONTROL_FIFO';
-const perfControlAckVariable = 'PERF_CONTROL_ACK';
-
 class PerfBenchmarkBase extends BenchmarkBase {
   PerfBenchmarkBase(super.name, {super.emitter = const PrintEmitter()});
 
-  String? perfControlFifo;
-  late RandomAccessFile openedFifo;
-  String? perfControlAck;
-  late RandomAccessFile openedAck;
-  late Process perfProcess;
+  late final Directory fifoDir;
+  late final String perfControlFifo;
+  late final RandomAccessFile openedFifo;
+  late final String perfControlAck;
+  late final RandomAccessFile openedAck;
+  late final Process perfProcess;
+
+  Future<void> _createFifos() async {
+    fifoDir = await Directory.systemTemp.createTemp('fifo');
+    perfControlFifo = '${fifoDir.path}/perf_control_fifo';
+    perfControlAck = '${fifoDir.path}/perf_control_ack';
+
+    try {
+      final fifoResult = await Process.run('mkfifo', [perfControlFifo]);
+      if (fifoResult.exitCode != 0) {
+        throw ProcessException('mkfifo', [perfControlFifo],
+            'Cannot create fifo: ${fifoResult.stderr}', fifoResult.exitCode);
+      }
+      final ackResult = await Process.run('mkfifo', [perfControlAck]);
+      if (ackResult.exitCode != 0) {
+        throw ProcessException('mkfifo', [perfControlAck],
+            'Cannot create fifo: ${ackResult.stderr}', ackResult.exitCode);
+      }
+    } catch (e) {
+      await fifoDir.delete(recursive: true);
+      rethrow;
+    }
+  }
 
   Future<void> _startPerfStat() async {
-    // TODO: Create these fifo files here, in a temp directory, instead of
-    // getting their paths passed in through environment variables.
-    perfControlFifo = Platform.environment[perfControlFifoVariable];
-    perfControlAck = Platform.environment[perfControlAckVariable];
-    if (perfControlFifo != null) {
+    await _createFifos();
+    try {
       perfProcess = await Process.start('perf', [
         'stat',
         '--delay',
@@ -36,36 +53,54 @@ class PerfBenchmarkBase extends BenchmarkBase {
         '-p',
         '$pid'
       ]);
-      await Future<void>.delayed(const Duration(seconds: 2));
+      //await Future<void>.delayed(const Duration(seconds: 2));
 
-      openedFifo = File(perfControlFifo!).openSync(mode: FileMode.writeOnly);
-      if (perfControlAck != null) {
-        openedAck = File(perfControlAck!).openSync();
-        openedFifo.writeStringSync('enable\n');
-        _waitForAck();
-      } else {
-        openedFifo.writeStringSync('enable\n');
-      }
+      openedFifo = File(perfControlFifo).openSync(mode: FileMode.writeOnly);
+
+      openedAck = File(perfControlAck).openSync();
+      openedFifo.writeStringSync('enable\n');
+      _waitForAck();
+    } catch (e) {
+      await fifoDir.delete(recursive: true);
+      rethrow;
     }
   }
 
   Future<void> _stopPerfStat(int totalIterations) async {
-    if (perfControlFifo != null) {
+    try {
       openedFifo.writeStringSync('disable\n');
       openedFifo.closeSync();
-      if (perfControlAck != null) {
-        _waitForAck();
-        openedAck.closeSync();
-      }
+      _waitForAck();
+      openedAck.closeSync();
       perfProcess.kill(ProcessSignal.sigint);
       final lines =
           utf8.decoder.bind(perfProcess.stderr).transform(const LineSplitter());
+      // Exit code from perf is -2 when terminated with SIGINT.
+      final exitCode = await perfProcess.exitCode;
+      if (exitCode != 0 && exitCode != -2) {
+        throw ProcessException(
+            'perf',
+            [
+              'stat',
+              '--delay',
+              '-1',
+              '--control',
+              'fifo:$perfControlFifo,$perfControlAck',
+              '-j',
+              '-p',
+              '$pid'
+            ],
+            (await lines.toList()).join('\n'),
+            exitCode);
+      }
       final events = [
         await for (final line in lines)
           if (line.startsWith('{"counter-value" : '))
             jsonDecode(line) as Map<String, dynamic>
       ];
       _reportPerfStats(events, totalIterations);
+    } finally {
+      await fifoDir.delete(recursive: true);
     }
   }
 
