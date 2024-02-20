@@ -4,6 +4,4 @@
 
 export 'src/async_benchmark_base.dart';
 export 'src/benchmark_base.dart' show BenchmarkBase;
-export 'src/perf_benchmark_base_stub.dart'
-    if (dart.library.io) 'src/perf_benchmark_base.dart';
 export 'src/score_emitter.dart';

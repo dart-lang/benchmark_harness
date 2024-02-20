@@ -21,7 +21,8 @@ class PerfBenchmarkBase extends BenchmarkBase {
   late Process perfProcess;
 
   Future<void> _startPerfStat() async {
-    // TODO: Create these fifos here instead of getting them through env variables.
+    // TODO: Create these fifo files here, in a temp directory, instead of
+    // getting their paths passed in through environment variables.
     perfControlFifo = Platform.environment[perfControlFifoVariable];
     perfControlAck = Platform.environment[perfControlAckVariable];
     if (perfControlFifo != null) {
