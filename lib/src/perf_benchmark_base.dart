@@ -17,103 +17,86 @@ class PerfBenchmarkBase extends BenchmarkBase {
   late final String perfControlAck;
   late final RandomAccessFile openedAck;
   late final Process perfProcess;
+  late final List<String> perfProcessArgs;
 
   Future<void> _createFifos() async {
-    fifoDir = await Directory.systemTemp.createTemp('fifo');
     perfControlFifo = '${fifoDir.path}/perf_control_fifo';
     perfControlAck = '${fifoDir.path}/perf_control_ack';
 
-    try {
-      final fifoResult = await Process.run('mkfifo', [perfControlFifo]);
-      if (fifoResult.exitCode != 0) {
-        throw ProcessException('mkfifo', [perfControlFifo],
-            'Cannot create fifo: ${fifoResult.stderr}', fifoResult.exitCode);
-      }
-      final ackResult = await Process.run('mkfifo', [perfControlAck]);
-      if (ackResult.exitCode != 0) {
-        throw ProcessException('mkfifo', [perfControlAck],
-            'Cannot create fifo: ${ackResult.stderr}', ackResult.exitCode);
-      }
-    } catch (e) {
-      await fifoDir.delete(recursive: true);
-      rethrow;
+    final fifoResult = await Process.run('mkfifo', [perfControlFifo]);
+    if (fifoResult.exitCode != 0) {
+      throw ProcessException('mkfifo', [perfControlFifo],
+          'Cannot create fifo: ${fifoResult.stderr}', fifoResult.exitCode);
+    }
+    final ackResult = await Process.run('mkfifo', [perfControlAck]);
+    if (ackResult.exitCode != 0) {
+      throw ProcessException('mkfifo', [perfControlAck],
+          'Cannot create fifo: ${ackResult.stderr}', ackResult.exitCode);
     }
   }
 
   Future<void> _startPerfStat() async {
     await _createFifos();
-    try {
-      perfProcess = await Process.start('perf', [
-        'stat',
-        '--delay',
-        '-1',
-        '--control',
-        'fifo:$perfControlFifo,$perfControlAck',
-        '-j',
-        '-p',
-        '$pid'
-      ]);
-      //await Future<void>.delayed(const Duration(seconds: 2));
+    perfProcessArgs = [
+      'stat',
+      '--delay',
+      '-1',
+      '--control',
+      'fifo:$perfControlFifo,$perfControlAck',
+      '-j',
+      '-p',
+      '$pid',
+    ];
+    perfProcess = await Process.start('perf', perfProcessArgs);
 
-      openedFifo = File(perfControlFifo).openSync(mode: FileMode.writeOnly);
+    openedFifo = File(perfControlFifo).openSync(mode: FileMode.writeOnly);
 
-      openedAck = File(perfControlAck).openSync();
-      openedFifo.writeStringSync('enable\n');
-      _waitForAck();
-    } catch (e) {
-      await fifoDir.delete(recursive: true);
-      rethrow;
-    }
+    openedAck = File(perfControlAck).openSync();
+    openedFifo.writeStringSync('enable\n');
+    _waitForAck();
   }
 
   Future<void> _stopPerfStat(int totalIterations) async {
-    try {
-      openedFifo.writeStringSync('disable\n');
-      openedFifo.closeSync();
-      _waitForAck();
-      openedAck.closeSync();
-      perfProcess.kill(ProcessSignal.sigint);
-      final lines =
-          utf8.decoder.bind(perfProcess.stderr).transform(const LineSplitter());
-      // Exit code from perf is -2 when terminated with SIGINT.
-      final exitCode = await perfProcess.exitCode;
-      if (exitCode != 0 && exitCode != -2) {
-        throw ProcessException(
-            'perf',
-            [
-              'stat',
-              '--delay',
-              '-1',
-              '--control',
-              'fifo:$perfControlFifo,$perfControlAck',
-              '-j',
-              '-p',
-              '$pid'
-            ],
-            (await lines.toList()).join('\n'),
-            exitCode);
-      }
-      final events = [
-        await for (final line in lines)
-          if (line.startsWith('{"counter-value" : '))
-            jsonDecode(line) as Map<String, dynamic>
-      ];
-      _reportPerfStats(events, totalIterations);
-    } finally {
-      await fifoDir.delete(recursive: true);
+    openedFifo.writeStringSync('disable\n');
+    openedFifo.closeSync();
+    _waitForAck();
+    openedAck.closeSync();
+    perfProcess.kill(ProcessSignal.sigint);
+    final lines =
+        utf8.decoder.bind(perfProcess.stderr).transform(const LineSplitter());
+    // Exit code from perf is -2 when terminated with SIGINT.
+    final exitCode = await perfProcess.exitCode;
+    if (exitCode != 0 && exitCode != -2) {
+      throw ProcessException(
+          'perf', perfProcessArgs, (await lines.toList()).join('\n'), exitCode);
     }
+    final events = [
+      await for (final line in lines)
+        if (line.contains('"counter-value"'))
+          jsonDecode(line) as Map<String, dynamic>
+    ];
+    _reportPerfStats(events, totalIterations);
   }
 
   /// Measures the score for the benchmark and returns it.
   Future<double> measurePerf() async {
+    Measurement result;
     setup();
-    // Warmup for at least 100ms. Discard result.
-    measureForImpl(warmup, 100);
-    await _startPerfStat();
-    // Run the benchmark for at least 2000ms.
-    var result = measureForImpl(exercise, minimumMeasureDurationMillis);
-    await _stopPerfStat(result.totalIterations);
-    teardown();
+    try {
+      fifoDir = await Directory.systemTemp.createTemp('fifo');
+      try {
+        // Warmup for at least 100ms. Discard result.
+        measureForImpl(warmup, 100);
+        await _startPerfStat();
+        // Run the benchmark for at least 2000ms.
+        result = measureForImpl(exercise, minimumMeasureDurationMillis);
+        await _stopPerfStat(result.totalIterations);
+      } finally {
+        await fifoDir.delete(recursive: true);
+      }
+    } finally {
+      teardown();
+    }
     return result.score;
   }
 
@@ -122,12 +105,11 @@ class PerfBenchmarkBase extends BenchmarkBase {
   }
 
   void _waitForAck() {
-    var ack = <int>[...openedAck.readSync(5)];
-    while (ack.length < 5) {
-      ack.addAll(openedAck.readSync(5 - ack.length));
-    }
-    if (String.fromCharCodes(ack) != 'ack\n\x00') {
-      print('Ack was $ack');
+    // Perf writes 'ack\n\x00' to the acknowledgement fifo.
+    const ackLength = 'ack\n\x00'.length;
+    var ack = <int>[...openedAck.readSync(ackLength)];
+    while (ack.length < ackLength) {
+      ack.addAll(openedAck.readSync(ackLength - ack.length));
     }
   }
 
