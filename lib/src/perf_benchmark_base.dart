@@ -48,7 +48,6 @@ class PerfBenchmarkBase extends BenchmarkBase {
       '$pid',
     ];
     perfProcess = await Process.start('perf', perfProcessArgs);
-
     openedFifo = File(perfControlFifo).openSync(mode: FileMode.writeOnly);
 
     openedAck = File(perfControlAck).openSync();
@@ -101,7 +100,7 @@ class PerfBenchmarkBase extends BenchmarkBase {
   }
 
   Future<void> reportPerf() async {
-    emitter.emit(name, await measurePerf());
+    emitter.emit(name, await measurePerf(), unit: 'us.');
   }
 
   void _waitForAck() {
@@ -119,10 +118,11 @@ class PerfBenchmarkBase extends BenchmarkBase {
       final metric =
           {'cycles:u': 'CpuCycles', 'page-faults:u': 'MajorPageFaults'}[event];
       if (metric != null) {
-        emitter.emit(
-            '$name($metric)', double.parse(counterString) / iterations);
+        emitter.emit(name, double.parse(counterString) / iterations,
+            metric: metric);
       }
     }
-    emitter.emit('$name.totalIterations', iterations.toDouble());
+    emitter.emit('$name.totalIterations', iterations.toDouble(),
+        metric: 'Count');
   }
 }
