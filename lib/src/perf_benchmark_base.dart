@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,8 +10,6 @@ import 'benchmark_base.dart';
 import 'score_emitter.dart';
 
 class PerfBenchmarkBase extends BenchmarkBase {
-  PerfBenchmarkBase(super.name, {super.emitter = const PrintEmitter()});
-
   late final Directory fifoDir;
   late final String perfControlFifo;
   late final RandomAccessFile openedFifo;
@@ -19,19 +18,17 @@ class PerfBenchmarkBase extends BenchmarkBase {
   late final Process perfProcess;
   late final List<String> perfProcessArgs;
 
+  PerfBenchmarkBase(super.name, {super.emitter = const PrintEmitter()});
+
   Future<void> _createFifos() async {
     perfControlFifo = '${fifoDir.path}/perf_control_fifo';
     perfControlAck = '${fifoDir.path}/perf_control_ack';
-
-    final fifoResult = await Process.run('mkfifo', [perfControlFifo]);
-    if (fifoResult.exitCode != 0) {
-      throw ProcessException('mkfifo', [perfControlFifo],
-          'Cannot create fifo: ${fifoResult.stderr}', fifoResult.exitCode);
-    }
-    final ackResult = await Process.run('mkfifo', [perfControlAck]);
-    if (ackResult.exitCode != 0) {
-      throw ProcessException('mkfifo', [perfControlAck],
-          'Cannot create fifo: ${ackResult.stderr}', ackResult.exitCode);
+    for (final path in [perfControlFifo, perfControlAck]) {
+      final fifoResult = await Process.run('mkfifo', [path]);
+      if (fifoResult.exitCode != 0) {
+        throw ProcessException('mkfifo', [path],
+            'Cannot create fifo: ${fifoResult.stderr}', fifoResult.exitCode);
+      }
     }
   }
 
@@ -39,17 +36,16 @@ class PerfBenchmarkBase extends BenchmarkBase {
     await _createFifos();
     perfProcessArgs = [
       'stat',
-      '--delay',
-      '-1',
-      '--control',
-      'fifo:$perfControlFifo,$perfControlAck',
-      '-j',
-      '-p',
-      '$pid',
+      '--delay=-1',
+      '--control=fifo:$perfControlFifo,$perfControlAck',
+      '-x\\t',
+      '--pid=$pid',
     ];
     perfProcess = await Process.start('perf', perfProcessArgs);
-    openedFifo = File(perfControlFifo).openSync(mode: FileMode.writeOnly);
+  }
 
+  void _enablePerf() {
+    openedFifo = File(perfControlFifo).openSync(mode: FileMode.writeOnly);
     openedAck = File(perfControlAck).openSync();
     openedFifo.writeStringSync('enable\n');
     _waitForAck();
@@ -61,20 +57,36 @@ class PerfBenchmarkBase extends BenchmarkBase {
     _waitForAck();
     openedAck.closeSync();
     perfProcess.kill(ProcessSignal.sigint);
-    final lines =
-        utf8.decoder.bind(perfProcess.stderr).transform(const LineSplitter());
-    // Exit code from perf is -2 when terminated with SIGINT.
+    unawaited(perfProcess.stdout.drain());
+    final lines = await perfProcess.stderr
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .toList();
     final exitCode = await perfProcess.exitCode;
-    if (exitCode != 0 && exitCode != -2) {
+    // Exit code from perf is -SIGINT when terminated with SIGINT.
+    if (exitCode != 0 && exitCode != -ProcessSignal.sigint.signalNumber) {
       throw ProcessException(
-          'perf', perfProcessArgs, (await lines.toList()).join('\n'), exitCode);
+          'perf', perfProcessArgs, lines.join('\n'), exitCode);
     }
-    final events = [
-      await for (final line in lines)
-        if (line.contains('"counter-value"'))
-          jsonDecode(line) as Map<String, dynamic>
-    ];
-    _reportPerfStats(events, totalIterations);
+
+    const metrics = {
+      'cycles': 'CpuCycles',
+      'page-faults': 'MajorPageFaults',
+    };
+    for (final line in lines) {
+      if (line.split('\t')
+          case [
+            String counter,
+            _,
+            String event && ('cycles' || 'page-faults'),
+            ...
+          ]) {
+        emitter.emit(name, double.parse(counter) / totalIterations,
+            metric: metrics[event]!);
+      }
+    }
+    emitter.emit('$name.totalIterations', totalIterations.toDouble(),
+        metric: 'Count');
   }
 
   /// Measures the score for the benchmark and returns it.
@@ -87,9 +99,15 @@ class PerfBenchmarkBase extends BenchmarkBase {
         // Warmup for at least 100ms. Discard result.
         measureForImpl(warmup, 100);
         await _startPerfStat();
-        // Run the benchmark for at least 2000ms.
-        result = measureForImpl(exercise, minimumMeasureDurationMillis);
-        await _stopPerfStat(result.totalIterations);
+        try {
+          _enablePerf();
+          // Run the benchmark for at least 2000ms.
+          result = measureForImpl(exercise, minimumMeasureDurationMillis);
+          await _stopPerfStat(result.totalIterations);
+        } catch (_) {
+          perfProcess.kill(ProcessSignal.sigkill);
+          rethrow;
+        }
       } finally {
         await fifoDir.delete(recursive: true);
       }
@@ -110,19 +128,5 @@ class PerfBenchmarkBase extends BenchmarkBase {
     while (ack.length < ackLength) {
       ack.addAll(openedAck.readSync(ackLength - ack.length));
     }
-  }
-
-  void _reportPerfStats(List<Map<String, dynamic>> events, int iterations) {
-    for (final {'event': String event, 'counter-value': String counterString}
-        in events) {
-      final metric =
-          {'cycles:u': 'CpuCycles', 'page-faults:u': 'MajorPageFaults'}[event];
-      if (metric != null) {
-        emitter.emit(name, double.parse(counterString) / iterations,
-            metric: metric);
-      }
-    }
-    emitter.emit('$name.totalIterations', iterations.toDouble(),
-        metric: 'Count');
   }
 }
